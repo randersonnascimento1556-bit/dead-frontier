@@ -1,0 +1,58 @@
+name: Gerar APK
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: "ativar = pedir arquivo da licenca (1a vez) | gerar = gerar o APK"
+        type: choice
+        options: [gerar, ativar]
+        default: gerar
+
+jobs:
+  ativar:
+    if: ${{ inputs.acao == 'ativar' }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: alf
+        uses: game-ci/unity-request-activation-file@v2
+        with:
+          unityVersion: 2022.3.45f1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.alf.outputs.filePath }}
+          path: ${{ steps.alf.outputs.filePath }}
+
+  gerar:
+    if: ${{ inputs.acao == 'gerar' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descompactar o ZIP
+        run: |
+          ZIP=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          unzip -oq "$ZIP" -d projeto
+          ls projeto
+
+      - uses: jlumbroso/free-disk-space@v1.2.0
+
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: projeto
+          targetPlatform: Android
+          unityVersion: 2022.3.45f1
+          buildMethod: DeadFrontierSetup.BuildCI
+          androidExportType: androidPackage
+          allowDirtyBuild: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeadFrontier-APK
+          path: |
+            projeto/build/Android
+            build/Android
+          if-no-files-found: warn
